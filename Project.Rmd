@@ -7,27 +7,46 @@ output: html_document
 
 ## Get and clean data
 ```{r}
+# get data
 fileUrlTraining <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
 fileUrlTesting <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
 download.file(fileUrlTraining, destfile="./pml-training.csv", method="curl")
 download.file(fileUrlTesting, destfile="./pml-testing.csv", method="curl")
-training <- read.csv("pml-training.csv")
-testing <- read.csv("pml-testing.csv")
+training <- read.csv("pml-training.csv", header=TRUE, stringsAsFactors=FALSE, sep=",", na.strings="NA")
+testing <- read.csv("pml-testing.csv", header=TRUE, stringsAsFactors=FALSE, sep=",", na.strings="NA")
+# cleaning
 navalues <- apply(sapply(training, is.na), 2, sum)
-strain <- subset(training, select = (navalues == 0))[,-(1:7)]
-stesting <- subset(testing, select = (navalues == 0))[,-(1:7)]
+strain <- subset(training, select = (navalues == 0))
+stesting <- subset(testing, select = (navalues == 0))
+# irrelevant columns
+strain <- strain[,-(1:7)]
+stesting <- stesting[,-(1:7)]
+# classe as a factor
+strain$classe <- as.factor(strain$classe)
+# remove all columns with more than 80% of empty values
+trigger <- .8 * nrow(strain)
+emptyCol <- c()
+for (i in 1:ncol(strain)) {
+    if (sum(is.na(strain[ ,i]) > trigger) || sum(strain[ ,i] == "") > trigger) {
+        emptyCol <- c(emptyCol, i)
+    }
+}
+strain <- strain[,-emptyCol]
 ```
 
 ## Building model
 
 ```{r}
 library(caret)
-#modelFit <- train(classe ~ ., data=strain, method="rpart") 
-# sorry, it takes too much time on my computer :-(
+library(randomForest)
+fit <- randomForest(classe ~ ., data=strain, ntree=250, mtry=10)
+print(fit)
+varImpPlot(fit)
 ```
 
 ## Cross validation
 
 ```{r}
-#cMatrix <- confusionMatrix()
+trainingPrediction <- predict(fit, newdata=strain)
+confusionMatrix(trainingPrediction,strain$classe)
 ```
